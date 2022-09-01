@@ -7,7 +7,6 @@ const shelljs = require("shelljs");
 const cors = require("cors");
 const path = require("path");
 const { Client, LocalAuth } = require("whatsapp-web.js");
-
 const config = require("./config.json");
 const { generateClientWhatsapp } = require("./components/utils");
 const app = express();
@@ -19,29 +18,18 @@ const clientSocket = require("socket.io")(server, {
     //allowEIO3: true, // false by default
 });
 
+const SESSION_FILE_PATH = './session.json';
+
 const folderPath = path.join(__dirname, ".wwebjs_auth");
-if (fs.existsSync(folderPath)) fs.rmSync(folderPath, { recursive: true });
+//if (fs.existsSync(folderPath)) fs.rmSync(folderPath, { recursive: true });
 
 /**** SESION DE CLIENT WHATSAPP */
 const sessions = [];
+const sessionsUserId = [];
+
 /** FIN DE SESION DE WHATSAPP */
 
 /** INICIALIZANDO SOCKET IO */
-const init = function(socket) {
-    const savedSessions = getSessionsFile();
-    console.log(savedSessions);
-    if (savedSessions.length > 0) {
-        if (socket) {
-            socket.emit("init", savedSessions);
-        } else {
-            savedSessions.forEach((sess) => {
-                createSession(sess.userId);
-            });
-        }
-    }
-};
-//init();
-
 clientSocket.on("connection", function(clientSocket) {
     console.log("CONNECT");
     //init(clientSocket);
@@ -56,12 +44,16 @@ const createSession = function(userId) {
     console.log("create session userID: ", userId);
     console.log(sessions);
     if (sessions.find((ses) => ses.userId == userId)) {
+        //clientSocket.emit("auth", "AUTENTICADO");
         return;
     }
+    console.log(__dirname);
+    console.log(__dirname + "\\.wwebjs_auth\\" + "session-" + userId);
     const client = new Client({
         authStrategy: new LocalAuth({ clientId: userId }),
         dataPath: path.join(__dirname, "..", ".wwebjs_auth"),
         puppeteer: {
+            handleSIGINT: false,
             headless: true,
             args: [
                 '--disable-gpu',
@@ -76,6 +68,7 @@ const createSession = function(userId) {
                 // '--single-process',
             ],
         },
+
     });
 
     client.initialize();
@@ -88,6 +81,7 @@ const createSession = function(userId) {
     /**SI ESTA AUTENTICADO */
     client.on("authenticated", (session) => {
         console.log("authenticated");
+        console.log(JSON.stringify(session));
         clientSocket.emit("authenticated", { id: userId, authenticated: true });
     });
 
@@ -99,6 +93,22 @@ const createSession = function(userId) {
     client.on("ready", () => {
         console.log("Client is ready!");
         clientSocket.emit("ready", { id: userId });
+
+        sessions.push({
+            userId: userId,
+            client: client
+        });
+
+        sessionsUserId.push({
+            userId: userId
+        })
+
+        fs.writeFileSync(SESSION_FILE_PATH, JSON.stringify(sessionsUserId), (err) => {
+            if (err) {
+                console.log("error de escritura de archivo");
+                console.error(err);
+            }
+        });
     });
 
     client.on("disconnected", () => {
@@ -112,16 +122,58 @@ const createSession = function(userId) {
 
     });
 
-    client.on('message', message => {
+
+
+    client.on('message', async message => {
         console.log(message.body);
-        clientSocket.emit("mensajes", { from: message.from, texto: message.body });
+        let media = null;
+        if (message.hasMedia) {
+            media = await message.downloadMedia();
+        }
+        clientSocket.emit("mensajes", {
+            from: message.from,
+            texto: message.body,
+            timestamp: message.timestamp,
+            fromMe: message.fromMe,
+            hasMedia: message.hasMedia,
+            type: message.type,
+            media: media
+        });
     });
 
-    sessions.push({
-        userId: userId,
-        client: client
+    client.on('message_create', async message => {
+        let media = null;
+        if (message.hasMedia) {
+            media = await message.downloadMedia();
+        }
+        if (message.fromMe) {
+            clientSocket.emit("mensajes-propios", {
+                to: message.to,
+                texto: message.body,
+                timestamp: message.timestamp,
+                fromMe: message.fromMe,
+                hasMedia: message.hasMedia,
+                type: message.type,
+                media: media
+            });
+        }
     });
+
 };
+
+
+if (fs.existsSync(SESSION_FILE_PATH)) {
+    let sess = fs.readFileSync(SESSION_FILE_PATH, 'utf-8');
+    //console.log(sess);
+    if (sess) {
+        let dataSession = JSON.parse(sess);
+        console.log(dataSession);
+        for (let i = 0; i < dataSession.length; i++) {
+            console.log(dataSession[i].userId);
+            createSession(dataSession[i].userId);
+        }
+    }
+}
 
 /**FIN GENERANDO CLIENTEs */
 
