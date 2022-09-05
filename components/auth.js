@@ -2,38 +2,38 @@ const router = require("express").Router();
 const fs = require("fs");
 const { generateClientWhatsapp } = require('./utils');
 
-router.get("/checkauth", async (req, res) => {
-  client
-    .getState()
-    .then((data) => {
-      console.log(data);
-      // res.send(data);
-      res.send({ status: "CONNECTED", message: data });
-    })
-    .catch((err) => {
-      if (err) {
-        res.send("DISCONNECTED");
-      }
-    });
+router.get("/checkauth", async(req, res) => {
+    client
+        .getState()
+        .then((data) => {
+            console.log(data);
+            // res.send(data);
+            res.send({ status: "CONNECTED", message: data });
+        })
+        .catch((err) => {
+            if (err) {
+                res.send("DISCONNECTED");
+            }
+        });
 });
 
-router.get("/getqr", async (req, res) => {
-  client
-    .getState()
-    .then((data) => {
-      if (data) {
-        res.write("<html><body><h2>Already Authenticated</h2></body></html>");
-        res.end();
-      } else sendQr(res);
-    })
-    .catch(() => sendQr(res));
+router.get("/getqr", async(req, res) => {
+    client
+        .getState()
+        .then((data) => {
+            if (data) {
+                res.write("<html><body><h2>Already Authenticated</h2></body></html>");
+                res.end();
+            } else sendQr(res);
+        })
+        .catch(() => sendQr(res));
 });
 
 function sendQr(res) {
-  fs.readFile("components/last.qr", (err, last_qr) => {
-    console.log("last_qr", last_qr);
-    if (!err && last_qr) {
-      var page = `
+    fs.readFile("components/last.qr", (err, last_qr) => {
+        console.log("last_qr", last_qr);
+        if (!err && last_qr) {
+            var page = `
                     <html>
                         <body>
                             <script type="module">
@@ -54,27 +54,27 @@ function sendQr(res) {
                         </body>
                     </html>
                 `;
-      res.write(page);
-      res.end();
-    }
-  });
+            res.write(page);
+            res.end();
+        }
+    });
 }
 
-router.get("/clear_session", async (req, res) => {
-  try {
-    global.client?.removeAllListeners();
-    const path = require("path");
-    const folderPath = path.join(__dirname, "..", ".wwebjs_auth");
-    if (fs.existsSync(folderPath)) fs.rmSync(folderPath, { recursive: true });
-    //Reset client
-    global.client = generateClientWhatsapp();
-    global.authed = false;
-    global.client.initialize();
-    res.json({ status: 200, message: "OK" });
-  } catch (error) {
-    console.log("error clear session", error);
-    res.status(401).json({ status: 401, message: "Error" });
-  }
+router.get("/clear_session", async(req, res) => {
+    try {
+        global.client.removeAllListeners();
+        const path = require("path");
+        const folderPath = path.join(__dirname, "..", ".wwebjs_auth");
+        if (fs.existsSync(folderPath)) fs.rmSync(folderPath, { recursive: true });
+        //Reset client
+        global.client = generateClientWhatsapp();
+        global.authed = false;
+        global.client.initialize();
+        res.json({ status: 200, message: "OK" });
+    } catch (error) {
+        console.log("error clear session", error);
+        res.status(401).json({ status: 401, message: "Error" });
+    }
 });
 
 module.exports = router;

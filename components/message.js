@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { MessageMedia } = require("whatsapp-web.js");
+const { MessageMedia, Message } = require("whatsapp-web.js");
 const fs = require('fs');
 var fileupload = require('express-fileupload');
 
@@ -162,6 +162,33 @@ router.post('/connectUser', async(req, res) => {
 
 });
 
+router.post('/close', async(req, res) => {
+    let from = req.body.from;
+    var client = getClientUser(from);
+
+    if (client) {
+        if (fs.existsSync(client.options.authStrategy.userDataDir)) {
+            console.log(client.options.authStrategy.userDataDir);
+            await fs.rmSync(client.options.authStrategy.userDataDir, { recursive: true, force: true });
+            sessionDelete(from);
+            client.logout();
+            //client.destroy();
+            console.log("existe");
+            res.send({ status: "CLOSE", message: "sesion cerrada" });
+        } else {
+            sessionDelete(from);
+            client.logout();
+            //client.destroy();
+            console.log("no existe");
+            res.send({ status: "DESCONECTADO", message: "usuario desconectado" });
+        }
+    } else {
+        console.log("desconectadooooo ");
+        res.send({ status: "DESCONECTADO", message: "usuario desconectado" });
+    }
+
+});
+
 router.post('/downloadMedia', async(req, res) => {
     let from = req.body.from;
     let msgMedia = req.body.msgMedia;
@@ -169,9 +196,19 @@ router.post('/downloadMedia', async(req, res) => {
 
     if (client) {
         if (msgMedia) {
-            const message = "";
-            media = await message.downloadMedia();
-            res.send({ statu: 'SUCCESS', message: `archivo descargado`, data: media });
+            /*message = new Message(client, msgMedia);
+            message = new Message(client, message._data);
+            console.log(message);
+            let media = await message.downloadMedia();*/
+            console.log("media new");
+            const result = await client.pupPage.evaluate(async(msgId) => {
+                console.log("entroooo");
+                console.log(msgId);
+                return msgId;
+            });
+            console.log("--------------------------------");
+            console.log(result);
+            res.send({ statu: 'SUCCESS', message: `archivo descargado`, data: result, data2: result });
         } else {
             res.send({ status: "ERROR", message: "no se descargo el archivo correctamente" });
 
@@ -213,6 +250,21 @@ const getClientUser = (from) => {
     return null;
 }
 
+const sessionDelete = (from) => {
+    var ses = sessions.filter((session) => {
+        if (!from.includes(session.userId)) {
+            return session;
+        }
+    });
 
+    sessions = ses;
+    global.sessions = sessions;
+    fs.writeFileSync('./session.json', JSON.stringify(ses), (err) => {
+        if (err) {
+            console.log("error de escritura de archivo");
+            console.error(err);
+        }
+    });
+}
 
 module.exports = router;

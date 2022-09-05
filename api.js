@@ -31,7 +31,7 @@ const sessionsUserId = [];
 
 /** INICIALIZANDO SOCKET IO */
 clientSocket.on("connection", function(clientSocket) {
-    console.log("CONNECT");
+    //console.log("CONNECT");
     //init(clientSocket);
     clientSocket.on("create-session", function(data) {
         createSession(data.userId);
@@ -117,7 +117,7 @@ const createSession = function(userId) {
             id: userId,
             text: "Whatsapp is disconnected!",
         });
-        //client.destroy();
+        client.destroy();
         //client.initialize().catch;
 
     });
@@ -128,7 +128,7 @@ const createSession = function(userId) {
         console.log(message.body);
         let media = null;
         if (message.hasMedia) {
-            media = await message.downloadMedia();
+            //media = await message.downloadMedia();
         }
         clientSocket.emit("mensajes", {
             from: message.from,
@@ -143,10 +143,11 @@ const createSession = function(userId) {
 
     client.on('message_create', async message => {
         let media = null;
-        if (message.hasMedia) {
-            media = await message.downloadMedia();
-        }
         if (message.fromMe) {
+            console.log(message);
+            if (message.hasMedia) {
+                //media = await message.downloadMedia();
+            }
             clientSocket.emit("mensajes-propios", {
                 to: message.to,
                 texto: message.body,
