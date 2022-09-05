@@ -1,7 +1,7 @@
 {
-    "port":5004,
-    "webhook":{
-        "enabled":false,
-        "path":""
+    "port": 5004,
+    "webhook": {
+        "enabled": false,
+        "path": ""
     }
 }
